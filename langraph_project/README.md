@@ -24,12 +24,12 @@ This file defines the core state machine for the AI agent:
   - Updates the state with the model's response
   - Returns the updated state
 
-- **build_graph()**: Configures the state machine:
+- **build_graph()**:  Configures the state machine:
   - Creates a new StateGraph instance
   - Adds the LLM node
   - Sets up the execution flow (currently a simple linear flow)
 
-### 2. Main Application (`main.py`)
+### 2.  Main Application (`main.py`)
 
 The entry point of the application that:
 1. Takes user input from the command line
