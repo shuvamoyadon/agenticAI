@@ -51,7 +51,11 @@ The entry point of the application that:
    ```bash
    pip install -r requirements.txt
    ```
-3. Set up your Hugging Face API token in the environment or directly in the code
+3. Create a `.env` file in the project root with your Hugging Face token:
+   ```
+   HUGGINGFACEHUB_API_TOKEN=your_token_here
+   ```
+   Replace `your_token_here` with your actual Hugging Face API token.
 
 ## Usage
 
@@ -65,6 +69,7 @@ python main.py
 - langgraph
 - huggingface-hub
 - pydantic
+- python-dotenv
 
 ## Security Note
 
