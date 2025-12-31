@@ -1,4 +1,4 @@
-MERGE INTO `playground-s-11-d5e75d75.test.CUSTOMER_PRODUCT_CONFIGURATION` T
+MERGE INTO `playground-s-11-d9f02bac.test.CUSTOMER_PRODUCT_CONFIGURATION` T
 USING (
 
 WITH exploded AS (
@@ -14,7 +14,7 @@ WITH exploded AS (
     CreatedDate,
     LastModifiedDate,
     JSON_QUERY_ARRAY(Payload) AS payload_array
-  FROM `playground-s-11-d5e75d75.test.T_PCT_GCP_FIN_PRODUCT_CONFIGURATION`
+  FROM `playground-s-11-d9f02bac.test.T_PCT_GCP_FIN_PRODUCT_CONFIGURATION`
   WHERE indicator_flag = 'N'
 ),
 
@@ -181,15 +181,20 @@ program_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS program_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -207,15 +212,20 @@ billing_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -233,15 +243,20 @@ product_level_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS product_level_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -259,15 +274,20 @@ client_type_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS client_type_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -285,15 +305,20 @@ assigned_owner_contact_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS assigned_owner_contact_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -311,15 +336,20 @@ client_contract_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS client_contract_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -337,15 +367,20 @@ account_management_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS account_management_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -363,15 +398,20 @@ roi_pgs_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS roi_pgs_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -389,15 +429,20 @@ implementation_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS implementation_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -415,15 +460,20 @@ reporting_pairs AS (
     Product_Association_ID,
     STRING_AGG(
   CASE
-    WHEN key_name = 'Contracted_LOB_Sub_Category' AND raw_val LIKE '%;%' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
-      TO_JSON_STRING(ARRAY(SELECT REGEXP_REPLACE(TRIM(v), r' +', '_') FROM UNNEST(SPLIT(raw_val, ';')) v WHERE TRIM(v) <> ''))
+    WHEN raw_val LIKE '%;%' THEN CONCAT(
+      '"', key_name, '":',
+      TO_JSON_STRING(
+        ARRAY(
+          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          FROM UNNEST(SPLIT(raw_val, ';')) v
+          WHERE TRIM(v) <> ''
+        )
+      )
     )
-    WHEN key_name = 'Contracted_LOB_Sub_Category' THEN CONCAT(
-      '"Contracted_LOB_Sub_Category":',
+    ELSE CONCAT(
+      '"', key_name, '":',
       IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
     )
-    ELSE CONCAT('"', key_name, '":', IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val)))
   END,
   ',') AS reporting_kv_string,
     MAX(JSON_VALUE(json_object,'$.Client_External_Id__c')) AS Client_External_Id__c,
@@ -614,7 +664,7 @@ agg AS (
     ON f.ID = impl.ID AND f.Product_Association_ID = impl.Product_Association_ID
   LEFT JOIN reporting_agg rep
     ON f.ID = rep.ID AND f.Product_Association_ID = rep.Product_Association_ID
-  LEFT JOIN `playground-s-11-d5e75d75.test.CUSTOMER_PRODUCT_ENTITLEMENT` CPE
+  LEFT JOIN `playground-s-11-d9f02bac.test.CUSTOMER_PRODUCT_ENTITLEMENT` CPE
     ON f.Product_Association_ID = CPE.sf_product_association_id
   GROUP BY
     f.business_unit_cd,
