@@ -39,10 +39,7 @@ program_rule_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -53,10 +50,7 @@ billing_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -67,10 +61,7 @@ product_level_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -81,10 +72,7 @@ client_type_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -95,10 +83,7 @@ assigned_owner_contact_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -109,10 +94,7 @@ client_contract_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -123,10 +105,7 @@ account_management_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -137,10 +116,7 @@ roi_pgs_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -151,10 +127,7 @@ implementation_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -165,10 +138,7 @@ reporting_kv AS (
   SELECT
     ID,
     Product_Association_ID,
-    REGEXP_REPLACE(
-      REGEXP_REPLACE(JSON_VALUE(json_object,'$.AttributeName__c'), r'[^A-Za-z0-9 ]',''),
-      r' +','_'
-    ) AS key_name,
+    JSON_VALUE(json_object,'$.AttributeName__c') AS key_name,
     JSON_VALUE(json_object,'$.Attribute_Value__c') AS raw_val,
     json_object
   FROM flattened
@@ -185,7 +155,7 @@ program_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -193,7 +163,7 @@ program_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS program_kv_string,
@@ -216,7 +186,7 @@ billing_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -224,7 +194,7 @@ billing_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS kv_string,
@@ -247,7 +217,7 @@ product_level_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -255,7 +225,7 @@ product_level_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS product_level_kv_string,
@@ -278,7 +248,7 @@ client_type_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -286,7 +256,7 @@ client_type_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS client_type_kv_string,
@@ -309,7 +279,7 @@ assigned_owner_contact_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -317,7 +287,7 @@ assigned_owner_contact_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS assigned_owner_contact_kv_string,
@@ -340,7 +310,7 @@ client_contract_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -348,7 +318,7 @@ client_contract_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS client_contract_kv_string,
@@ -371,7 +341,7 @@ account_management_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -379,7 +349,7 @@ account_management_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS account_management_kv_string,
@@ -402,7 +372,7 @@ roi_pgs_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -410,7 +380,7 @@ roi_pgs_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS roi_pgs_kv_string,
@@ -433,7 +403,7 @@ implementation_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -441,7 +411,7 @@ implementation_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS implementation_kv_string,
@@ -464,7 +434,7 @@ reporting_pairs AS (
       '"', key_name, '":',
       TO_JSON_STRING(
         ARRAY(
-          SELECT REGEXP_REPLACE(TRIM(v), r' +', '_')
+          SELECT TRIM(v)
           FROM UNNEST(SPLIT(raw_val, ';')) v
           WHERE TRIM(v) <> ''
         )
@@ -472,7 +442,7 @@ reporting_pairs AS (
     )
     ELSE CONCAT(
       '"', key_name, '":',
-      IF(raw_val IS NULL, 'null', TO_JSON_STRING(REGEXP_REPLACE(TRIM(raw_val), r' +', '_')))
+      IF(raw_val IS NULL, 'null', TO_JSON_STRING(raw_val))
     )
   END,
   ',') AS reporting_kv_string,
