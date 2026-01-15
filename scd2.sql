@@ -14,7 +14,7 @@ CREATE TABLE `playground-s-11-77e7acd7.test.src` (
 
 ### step 2
 
-INSERT INTO `playground-s-11-77e7acd7.test.src` (
+INSERT INTO `playground-s-11-a9c9b9af.test.src` (
   ID,
   AccountId,
   line_of_business,
@@ -34,44 +34,46 @@ SELECT
   CURRENT_TIMESTAMP() AS inserted_time,
   CURRENT_TIMESTAMP() AS updated_time,
   'Y' AS indicator_flag,
-  TO_JSON(
-    STRUCT(
-     'AMA' AS ACI_Client_Audit_Contact__c,
-      NULL AS ACI_Client_Primary_Claim_Denial_Contact__c,
-      NULL AS ACI_Client_QA_Contact__c,
-      NULL AS ACI_Privacy_Billing_Contact__c,
-      NULL AS ACI_Secondary_Claim_Denial_Contact__c,
-      NULL AS AcAu_Client_Audit_Tools_List__c,
-      NULL AS AcAu_Client_Delegation_Reports__c,
-      NULL AS AcAu_Client_List__c,
-      NULL AS AcAu_Client_NCQA_Usage_Flag__c,
-      NULL AS AcAu_Client_Oversight_Plan__c,
-      NULL AS AcAu_LOB_Specific_Reqs__c,
-      NULL AS AcAu_NCQA__c,
-      NULL AS AcAu_NCQA_Pls_Specify__c,
-      '001bc00000Smc8AAR' AS AccountId,
-      NULL AS Billing_According_Claims_Auto_Adjudicate__c,
-      NULL AS Billing_Bimonthly_Filing_Titles__c,
-      NULL AS Billing_Bypass_Add_Cred__c,
-      NULL AS Billing_Claims_Adjudication_Details__c,
-      NULL AS Billing_Cost_to_Client__c,
-      NULL AS Billing_Credentialing_Req_Details__c,
-      NULL AS Billing_Entity__c,
-      NULL AS Billing_Fee_Schedule_Details__c,
-      NULL AS Billing_File_Transfer_Frequency__c,
-      NULL AS Billing_Interactive_Billable_Rare__c,
-      NULL AS Billing_Is_CBB_Applicable__c,
-      NULL AS Billing_List_Billable_Member_Type__c,
-      'No' AS Billing_List_Pricing_Flat__c,
-      NULL AS Billing_Load_Accordant_Fee__c,
-      'Yes' AS Billing_Managed_Status__c,
-      NULL AS Billing_Mgmt_Complete_Status__c,
-      NULL AS Billing_Oncology_Members__c,
-      NULL AS Billing_Please_Specify_CBB__c,
-      NULL AS Billing_Please_Specify_EOB__c
-    )
-  ) AS Payload;
 
+  TO_JSON(
+    ARRAY[
+      STRUCT(
+        'AMA' AS ACI_Client_Audit_Contact__c,
+        NULL AS ACI_Client_Primary_Claim_Denial_Contact__c,
+        NULL AS ACI_Client_QA_Contact__c,
+        NULL AS ACI_Privacy_Billing_Contact__c,
+        NULL AS ACI_Secondary_Claim_Denial_Contact__c,
+        NULL AS AcAu_Client_Audit_Tools_List__c,
+        NULL AS AcAu_Client_Delegation_Reports__c,
+        NULL AS AcAu_Client_List__c,
+        NULL AS AcAu_Client_NCQA_Usage_Flag__c,
+        NULL AS AcAu_Client_Oversight_Plan__c,
+        NULL AS AcAu_LOB_Specific_Reqs__c,
+        NULL AS AcAu_NCQA__c,
+        NULL AS AcAu_NCQA_Pls_Specify__c,
+        '001bc00000Smc8AAR' AS AccountId,
+        NULL AS Billing_According_Claims_Auto_Adjudicate__c,
+        NULL AS Billing_Bimonthly_Filing_Titles__c,
+        NULL AS Billing_Bypass_Add_Cred__c,
+        NULL AS Billing_Claims_Adjudication_Details__c,
+        NULL AS Billing_Cost_to_Client__c,
+        NULL AS Billing_Credentialing_Req_Details__c,
+        NULL AS Billing_Entity__c,
+        NULL AS Billing_Fee_Schedule_Details__c,
+        NULL AS Billing_File_Transfer_Frequency__c,
+        NULL AS Billing_Interactive_Billable_Rare__c,
+        NULL AS Billing_Is_CBB_Applicable__c,
+        NULL AS Billing_List_Billable_Member_Type__c,
+        'No' AS Billing_List_Pricing_Flat__c,
+        NULL AS Billing_Load_Accordant_Fee__c,
+        'Yes' AS Billing_Managed_Status__c,
+        NULL AS Billing_Mgmt_Complete_Status__c,
+        NULL AS Billing_Oncology_Members__c,
+        NULL AS Billing_Please_Specify_CBB__c,
+        NULL AS Billing_Please_Specify_EOB__c
+      )
+    ]
+  ) AS Payload;
 
 
 #### step 3 . create a table to capture active records for matching id : 
