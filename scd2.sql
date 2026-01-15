@@ -79,38 +79,50 @@ SELECT
 #### step 3 . create a table to capture active records for matching id : 
 
 CREATE or replace TABLE `playground-s-11-77e7acd7.test.src_prepared` AS
+WITH base AS (
+  SELECT
+    id,
+    indicator_flag,
+    IFNULL(JSON_QUERY_ARRAY(payload)[SAFE_OFFSET(0)], JSON '{}') AS payload_obj
+  FROM `playground-s-11-a9c9b9af.test.src`
+  WHERE indicator_flag = 'Y'
+)
+
 SELECT
   CAST(id AS STRING) AS id,
   indicator_flag,
 
+  -- Extract line_of_business from payload
+  JSON_VALUE(payload_obj, '$.line_of_business') AS line_of_business,
+
   -- Assigned Owner & Contact Information (ACI*)
   (
-    SELECT JSON_OBJECT(
-      ARRAY_AGG(k),
-      ARRAY_AGG(payload_json[k])
-    )
-    FROM UNNEST(JSON_KEYS(payload_json)) AS k
+    SELECT
+      IF(
+        COUNT(*) = 0,
+        JSON '{}',
+        JSON_OBJECT(ARRAY_AGG(k), ARRAY_AGG(payload_obj[k]))
+      )
+    FROM UNNEST(JSON_KEYS(payload_obj)) AS k
     WHERE k LIKE 'ACI%'
+      AND JSON_TYPE(payload_obj[k]) != 'null'
   ) AS assigned_owner_contact_information,
 
   -- Accreditation & Audits (AcAu*)
   (
-    SELECT JSON_OBJECT(
-      ARRAY_AGG(k),
-      ARRAY_AGG(payload_json[k])
-    )
-    FROM UNNEST(JSON_KEYS(payload_json)) AS k
+    SELECT
+      IF(
+        COUNT(*) = 0,
+        JSON '{}',
+        JSON_OBJECT(ARRAY_AGG(k), ARRAY_AGG(payload_obj[k]))
+      )
+    FROM UNNEST(JSON_KEYS(payload_obj)) AS k
     WHERE k LIKE 'AcAu%'
+      AND JSON_TYPE(payload_obj[k]) != 'null'
   ) AS accreditation_audits
 
-FROM (
-  SELECT
-    id,
-    indicator_flag,
-    SAFE_CAST(payload AS JSON) AS payload_json
-  FROM `playground-s-11-77e7acd7.test.src`
-  WHERE indicator_flag = 'Y'
-);
+FROM base;
+
 
 
 ### step 4: I have created target table with few cilumn and audit columns
