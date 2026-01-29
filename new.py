@@ -51,6 +51,9 @@ bucket_name_template = Template(config["bucket_name"])
 GCP_PROJECT_NAME = project_name_template.render(env=ENV)
 CONFIG_BUCKET_NAME = bucket_name_template.render(env=ENV)
 
+# Log the bucket name for debugging
+print(f"Generated GCP Bucket Name: {CONFIG_BUCKET_NAME}")
+
 default_args = {
     "start_date": datetime(2025, 11, 9),
 }
