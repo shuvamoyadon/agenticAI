@@ -87,9 +87,11 @@ def get_secret(project_id: str, secret_name: str) -> str:
     
     return secret_payload
 
-# Fetch the secret for GCP_CONN_ID (plss_secret_dev)
-# Pass the current project ID dynamically
-GCP_CONN_ID_SECRET = get_secret(GCP_PROJECT_NAME, "plss_secret_dev")  # Adjust the secret name if necessary
+# Dynamically generate the secret name based on the environment (e.g., plss_secret_dev, plss_secret_qa, etc.)
+secret_name = f"plss_secret_{ENV}"
+
+# Fetch the secret for GCP_CONN_ID using the dynamically generated secret name
+GCP_CONN_ID_SECRET = get_secret(GCP_PROJECT_NAME, secret_name)
 
 def _get_sql_files_for_project(params: dict) -> List[str]:
     """
