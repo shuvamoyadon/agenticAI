@@ -8,6 +8,8 @@ from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from google.cloud import bigquery
 from jinja2 import Template
 
+# Define GCP connection ID
+GCP_CONN_ID = "bigquery_plss"
 LOCATION = "US"
 
 # ----------------------------------------------------------------------
@@ -55,37 +57,42 @@ default_args = {
 
 def _get_sql_files_for_project(params: dict) -> List[str]:
     """
-    Retrieve the list of SQL files from params (passed during DAG run) or auto-discover in GCS.
+    Retrieve the list of SQL files from multiple directories (passed during DAG run) or auto-discover in GCS.
     """
-    # SQL directory and files are passed as parameters in Airflow DAG run
-    sql_dir = params.get("sql_dir")
+    # Multiple SQL directories and files are passed as parameters in Airflow DAG run
+    sql_dirs = params.get("sql_dirs", [])  # List of SQL directories
     sql_files = params.get("sql_files", [])
 
-    if not sql_dir and not sql_files:
-        raise ValueError("Either sql_dir or sql_files must be provided.")
+    if not sql_dirs and not sql_files:
+        raise ValueError("Either sql_dirs or sql_files must be provided.")
     
+    all_sql_files = []
+
     if sql_files:
         # If sql_files are defined in the params, return them
-        return [f"{sql_dir.rstrip('/')}/{fname}" for fname in sql_files]
-    
-    # Case 2: Auto-discover all SQL files under sql_dir in GCS if only sql_dir is provided
-    gcs_hook = GCSHook(gcp_conn_id="GCP_CONN_ID")  # Use the Airflow GCP connection ID
-    prefix = sql_dir.rstrip("/") + "/"
-    all_objects = gcs_hook.list(bucket_name=CONFIG_BUCKET_NAME, prefix=prefix)
+        for sql_dir in sql_dirs:
+            all_sql_files.extend([f"{sql_dir.rstrip('/')}/{fname}" for fname in sql_files])
+    else:
+        # Case 2: Auto-discover all SQL files under sql_dirs in GCS if sql_files is not provided
+        gcs_hook = GCSHook(gcp_conn_id=GCP_CONN_ID)  # Using the Airflow GCP connection ID
+        for sql_dir in sql_dirs:
+            prefix = sql_dir.rstrip("/") + "/"
+            all_objects = gcs_hook.list(bucket_name=CONFIG_BUCKET_NAME, prefix=prefix)
 
-    if not all_objects:
-        raise ValueError(f"No files found under gs://{CONFIG_BUCKET_NAME}/{prefix} for project.")
+            if not all_objects:
+                raise ValueError(f"No files found under gs://{CONFIG_BUCKET_NAME}/{prefix} for project.")
 
-    sql_files_to_run = [obj for obj in all_objects if obj.endswith(".sql")]
+            sql_files_to_run = [obj for obj in all_objects if obj.endswith(".sql")]
+            all_sql_files.extend(sql_files_to_run)
 
-    if not sql_files_to_run:
-        raise ValueError(f"No .sql files found under gs://{CONFIG_BUCKET_NAME}/{prefix}")
+    if not all_sql_files:
+        raise ValueError(f"No .sql files found under gs://{CONFIG_BUCKET_NAME}/ in the specified directories.")
 
-    return sql_files_to_run
+    return all_sql_files
 
 def run_ddl_sql_files(**context):
     # BigQuery client using the Airflow GCP connection ID
-    bq_hook = BigQueryHook(gcp_conn_id="GCP_CONN_ID", location=LOCATION)  # Use the Airflow GCP connection ID
+    bq_hook = BigQueryHook(gcp_conn_id=GCP_CONN_ID, location=LOCATION)  # Use the Airflow GCP connection ID
     client: bigquery.Client = bq_hook.get_client(project_id=GCP_PROJECT_NAME)
 
     # Retrieve top-level config params
@@ -98,12 +105,12 @@ def run_ddl_sql_files(**context):
     if not params:
         raise ValueError("No params found for the task execution.")
     
-    # Get the SQL files for the given params (sql_dir and sql_files)
+    # Get the SQL files for the given params (sql_dirs and sql_files)
     sql_files_to_run = _get_sql_files_for_project(params)
 
     # Execute SQL Files
     for sql_path in sql_files_to_run:
-        gcs_hook = GCSHook(gcp_conn_id="GCP_CONN_ID")  # Use the Airflow GCP connection ID
+        gcs_hook = GCSHook(gcp_conn_id=GCP_CONN_ID)  # Using the Airflow GCP connection ID
         content = gcs_hook.download(
             bucket_name=CONFIG_BUCKET_NAME,
             object_name=sql_path
