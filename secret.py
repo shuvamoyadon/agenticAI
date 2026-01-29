@@ -5,6 +5,10 @@
 #     "sql_files": ["file1.sql", "file2.sql"]
     }
 
+### for directory, you neeed to give, 
+{
+#     "sql_dir": "your/sql/directory"
+    }
 
 from datetime import datetime
 from typing import List
@@ -95,14 +99,14 @@ def _get_sql_files_for_project(params: dict) -> List[str]:
     sql_dir = params.get("sql_dir")
     sql_files = params.get("sql_files", [])
 
-    if not sql_dir:
-        raise ValueError("SQL directory is not defined in the params.")
+    if not sql_dir and not sql_files:
+        raise ValueError("Either sql_dir or sql_files must be provided.")
     
     if sql_files:
         # If sql_files are defined in the params, return them
         return [f"{sql_dir.rstrip('/')}/{fname}" for fname in sql_files]
     
-    # Case 2: Auto-discover all SQL files under sql_dir in GCS
+    # Case 2: Auto-discover all SQL files under sql_dir in GCS if only sql_dir is provided
     gcs_hook = GCSHook(gcp_conn_id=GCP_CONN_ID_SECRET)  # Using secret-managed GCP_CONN_ID
     prefix = sql_dir.rstrip("/") + "/"
     all_objects = gcs_hook.list(bucket_name=CONFIG_BUCKET_NAME, prefix=prefix)
