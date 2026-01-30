@@ -1,151 +1,249 @@
+import os
+import json
+import logging
 from datetime import datetime
-from typing import List
+from typing import List, Dict, Tuple
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.models import Variable
-from airflow.providers.google.cloud.hooks.bigquery import BigQueryHook
-from airflow.providers.google.cloud.hooks.gcs import GCSHook
+from airflow.hooks.base import BaseHook
+
 from google.cloud import bigquery
+from google.cloud import storage
 from jinja2 import Template
 
-# Define GCP connection ID
-GCP_CONN_ID = "bigquery_plss"
+# ---------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------
+FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger("plss_ddl_airflow_connection")
+logger.setLevel(logging.INFO)
+
 LOCATION = "US"
 
-# ----------------------------------------------------------------------
-# ENV from Airflow Variable
-# In Airflow UI -> Admin -> Variables:
-#   Key: ENV
-#   Value: dev (or qa / prod)
-# ----------------------------------------------------------------------
+# ---------------------------------------------------------------------
+# Environment setup
+# ---------------------------------------------------------------------
+CONFIG_VAR_NAME = "PLSS_PROJECT_CONFIG"
+os.environ["CONFIG_PROJECT_VAR"] = CONFIG_VAR_NAME
 
-ENV = Variable.get("ENV").lower()  # Fetch and convert the environment value to lowercase (dev, qa, prod)
-
-# Define the configuration for different environments (dev, qa, prod) with dynamic {env} placeholders
+# ---------------------------------------------------------------------
+# ENV → project & bucket mapping
+# ---------------------------------------------------------------------
 ENV_CONFIG = {
     "dev": {
-        "project_name": "edp-{env}-carema",  # project_name template with {env}
-        "bucket_name": "cma-plss-onboarding-lan-ent-{env}"  # bucket_name template with {env}
+        "project_name": "edp-{env}-carema",
+        "bucket_name": "cma-plss-onboarding-lan-ent-{env}",
     },
     "qa": {
-        "project_name": "edp-{env}-tenants-carema",  # project_name template with {env}
-        "bucket_name": "cma-plss-onboarding-lan-ent-{env}"  # bucket_name template with {env}
+        "project_name": "edp-{env}-tenants-carema",
+        "bucket_name": "cma-plss-onboarding-lan-ent-{env}",
+    },
+    "preprod": {
+        "project_name": "edp-{env}-carema",
+        "bucket_name": "cma-plss-onboarding-lan-ent-{env}",
     },
     "prod": {
-        "project_name": "edp-{env}-carema",  # project_name template with {env}
-        "bucket_name": "cma-plss-onboarding-lan-ent-{env}"  # bucket_name template with {env}
-    }
+        "project_name": "edp-{env}-carema",
+        "bucket_name": "cma-plss-onboarding-lan-ent-{env}",
+    },
 }
 
-# Dynamically select the config based on the current environment (dev, qa, prod)
-if ENV in ENV_CONFIG:
-    config = ENV_CONFIG[ENV]
-else:
-    raise ValueError(f"Unknown environment: {ENV}")
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+def get_env_from_airflow() -> str:
+    env = Variable.get("ENV", default_var=None)
+    if not env:
+        raise ValueError("ENV Airflow Variable must be set (dev/qa/preprod/prod)")
+    env = env.lower().strip()
+    if env not in ENV_CONFIG:
+        raise ValueError(f"Invalid ENV '{env}', expected {list(ENV_CONFIG.keys())}")
+    return env
 
-# Use Jinja templating to replace the {env} placeholder in project_name and bucket_name
-project_name_template = Template(config["project_name"])
-bucket_name_template = Template(config["bucket_name"])
 
-# Replace {env} with the actual environment value (dev, qa, prod)
-GCP_PROJECT_NAME = project_name_template.render(env=ENV)
-CONFIG_BUCKET_NAME = bucket_name_template.render(env=ENV)
+def get_project_name(env: str) -> str:
+    return ENV_CONFIG[env]["project_name"].format(env=env)
 
-# Log the project name and bucket name for debugging purposes
-print(f"Generated GCP Project Name: {GCP_PROJECT_NAME}")
-print(f"Generated GCP Bucket Name: {CONFIG_BUCKET_NAME}")
 
-default_args = {
-    "start_date": datetime(2025, 11, 9),
-}
+def get_bucket_name(env: str) -> str:
+    return ENV_CONFIG[env]["bucket_name"].format(env=env)
 
-def _get_sql_files_for_project(params: dict) -> List[str]:
-    """
-    Retrieve the list of SQL files from multiple directories (passed during DAG run) or auto-discover in GCS.
-    """
-    # Multiple SQL directories and files are passed as parameters in Airflow DAG run
-    sql_dirs = params.get("sql_dirs", [])  # List of SQL directories
+
+def get_plss_project_config() -> Dict:
+    try:
+        cfg = Variable.get(CONFIG_VAR_NAME, deserialize_json=True)
+    except Exception:
+        raw = Variable.get(CONFIG_VAR_NAME, default_var=None)
+        if not raw:
+            raise ValueError(f"{CONFIG_VAR_NAME} Airflow Variable not found")
+        cfg = json.loads(raw)
+
+    if not isinstance(cfg, dict):
+        raise ValueError(f"{CONFIG_VAR_NAME} must be JSON object")
+    return cfg
+
+
+def read_connections_from_config() -> Tuple[str, str]:
+    cfg = get_plss_project_config()
+
+    bq_conn = cfg.get("PA_BIGQUERY_CONNECTION")
+    if not bq_conn:
+        raise ValueError("PA_BIGQUERY_CONNECTION missing in PLSS_PROJECT_CONFIG")
+
+    gcs_impersonate_sa = cfg.get("GCS_IMPERSONATE_SERVICE_ACCOUNT")
+    if not gcs_impersonate_sa:
+        raise ValueError("GCS_IMPERSONATE_SERVICE_ACCOUNT missing in PLSS_PROJECT_CONFIG")
+
+    return bq_conn, gcs_impersonate_sa
+
+
+# ---------------------------------------------------------------------
+# Client builders
+# ---------------------------------------------------------------------
+def get_bigquery_client_from_connection(conn_id: str) -> bigquery.Client:
+    logger.info(f"Creating BigQuery client using connection: {conn_id}")
+    conn = BaseHook.get_connection(conn_id)
+    extras = conn.extra_dejson or {}
+
+    project = extras.get("extra_google_cloud_platform_project") or conn.schema
+    if not project:
+        raise ValueError(
+            f"Connection '{conn_id}' must define "
+            f"extra_google_cloud_platform_project in extras"
+        )
+
+    key_path = extras.get("extra_google_cloud_platform_key_path")
+    if key_path:
+        from google.oauth2 import service_account
+        credentials = service_account.Credentials.from_service_account_file(
+            key_path,
+            scopes=["https://www.googleapis.com/auth/bigquery"],
+        )
+        return bigquery.Client(credentials=credentials, project=project)
+
+    return bigquery.Client(project=project)
+
+
+def get_gcs_client_with_impersonation(target_sa: str) -> storage.Client:
+    logger.info(f"Creating GCS client via impersonation: {target_sa}")
+    import google.auth
+    from google.auth import impersonated_credentials
+
+    source_creds, project = google.auth.default()
+
+    target_creds = impersonated_credentials.Credentials(
+        source_credentials=source_creds,
+        target_principal=target_sa,
+        target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        lifetime=600,
+    )
+
+    return storage.Client(credentials=target_creds, project=project)
+
+
+# ---------------------------------------------------------------------
+# SQL discovery
+# ---------------------------------------------------------------------
+def get_sql_files(
+    params: dict, bucket_name: str, gcs_client: storage.Client
+) -> List[str]:
+
+    sql_dirs = params.get("sql_dirs", [])
     sql_files = params.get("sql_files", [])
 
+    if isinstance(sql_dirs, str):
+        sql_dirs = [sql_dirs]
+    if isinstance(sql_files, str):
+        sql_files = [sql_files]
+
     if not sql_dirs and not sql_files:
-        raise ValueError("Either sql_dirs or sql_files must be provided.")
-    
-    all_sql_files = []
+        raise ValueError("Provide sql_dirs and/or sql_files")
 
-    if sql_files:
-        # If sql_files are defined in the params, return them
-        for sql_dir in sql_dirs:
-            all_sql_files.extend([f"{sql_dir.rstrip('/')}/{fname}" for fname in sql_files])
-    else:
-        # Case 2: Auto-discover all SQL files under sql_dirs in GCS if sql_files is not provided
-        gcs_hook = GCSHook(gcp_conn_id=GCP_CONN_ID)  # Using the Airflow GCP connection ID
-        for sql_dir in sql_dirs:
-            prefix = sql_dir.rstrip("/") + "/"
-            all_objects = gcs_hook.list(bucket_name=CONFIG_BUCKET_NAME, prefix=prefix)
+    bucket = gcs_client.bucket(bucket_name)
+    result: List[str] = []
 
-            if not all_objects:
-                raise ValueError(f"No files found under gs://{CONFIG_BUCKET_NAME}/{prefix} for project.")
+    # Auto-discover directories
+    for d in sql_dirs:
+        prefix = d.rstrip("/") + "/"
+        blobs = bucket.list_blobs(prefix=prefix)
+        found = [b.name for b in blobs if b.name.endswith(".sql")]
+        logger.info(f"Found {len(found)} SQL files in {d}")
+        result.extend(found)
 
-            sql_files_to_run = [obj for obj in all_objects if obj.endswith(".sql")]
-            all_sql_files.extend(sql_files_to_run)
+    # Explicit files
+    for f in sql_files:
+        if "/" in f:
+            if f.endswith(".sql"):
+                result.append(f)
+        else:
+            for d in sql_dirs:
+                result.append(f"{d.rstrip('/')}/{f}")
 
-    if not all_sql_files:
-        raise ValueError(f"No .sql files found under gs://{CONFIG_BUCKET_NAME}/ in the specified directories.")
+    # Deduplicate
+    result = list(dict.fromkeys(result))
+    if not result:
+        raise ValueError("No SQL files resolved")
 
-    return all_sql_files
+    return result
 
+
+# ---------------------------------------------------------------------
+# Main task
+# ---------------------------------------------------------------------
 def run_ddl_sql_files(**context):
-    # BigQuery client using the Airflow GCP connection ID
-    bq_hook = BigQueryHook(gcp_conn_id=GCP_CONN_ID, location=LOCATION)  # Use the Airflow GCP connection ID
-    client: bigquery.Client = bq_hook.get_client(project_id=GCP_PROJECT_NAME)
+    env = get_env_from_airflow()
+    project = get_project_name(env)
+    bucket_name = get_bucket_name(env)
 
-    # Retrieve top-level config params
-    env = ENV
-    execution_date = context.get("ds")
-    
-    # Fetch params passed to the task
+    bq_conn_id, gcs_impersonate_sa = read_connections_from_config()
+
+    bq_client = get_bigquery_client_from_connection(bq_conn_id)
+    gcs_client = get_gcs_client_with_impersonation(gcs_impersonate_sa)
+
     params = context.get("params")
-    
     if not params:
-        raise ValueError("No params found for the task execution.")
-    
-    # Get the SQL files for the given params (sql_dirs and sql_files)
-    sql_files_to_run = _get_sql_files_for_project(params)
+        raise ValueError("No params provided to DAG")
 
-    # Execute SQL Files
-    for sql_path in sql_files_to_run:
-        gcs_hook = GCSHook(gcp_conn_id=GCP_CONN_ID)  # Using the Airflow GCP connection ID
-        content = gcs_hook.download(
-            bucket_name=CONFIG_BUCKET_NAME,
-            object_name=sql_path
-        )
-        raw_sql = content.decode("utf-8")
+    sql_files = get_sql_files(params, bucket_name, gcs_client)
+    bucket = gcs_client.bucket(bucket_name)
 
-        # Render the SQL template with only 'env' and 'execution_date'
-        rendered_sql = Template(raw_sql).render(
+    execution_date = context.get("ds")
+
+    for path in sql_files:
+        sql = bucket.blob(path).download_as_text()
+        rendered_sql = Template(sql).render(
             env=env,
-            ds=execution_date,  # You can keep 'execution_date' if required by your SQL template
+            ENV=env,
+            ds=execution_date,
         )
 
-        # Execute the SQL in BigQuery
-        print("rendered_sql", rendered_sql)
-        job = client.query(rendered_sql, location=LOCATION)
+        logger.info(f"Executing SQL: gs://{bucket_name}/{path}")
+        job = bq_client.query(rendered_sql, location=LOCATION)
         job.result()
+        logger.info("SUCCESS")
 
-        print(f"[SUCCESS] Executed SQL => gs://{CONFIG_BUCKET_NAME}/{sql_path} (env={env})")
 
+# ---------------------------------------------------------------------
+# DAG definition
+# ---------------------------------------------------------------------
+try:
+    _env = get_env_from_airflow()
+    _project_tag = get_project_name(_env)
+except Exception:
+    _project_tag = "edp-dev-carema"
 
-# ======================================================================
-# DAG
-# ======================================================================
+default_args = {"start_date": datetime(2025, 11, 9)}
 
 with DAG(
-    dag_id="plss_ddl_1",
+    dag_id="plss_ddl_airflow_connection",
     default_args=default_args,
     schedule_interval=None,
     catchup=False,
     render_template_as_native_obj=True,
-    tags=["cvs_app_id:AP", f"project_id:{GCP_PROJECT_NAME}"],
+    tags=["cvs_app_id:APM001721", f"project_id:{_project_tag}"],
 ) as dag:
 
     run_ddl = PythonOperator(
