@@ -108,14 +108,42 @@ def get_bigquery_client_from_connection(conn_id: str) -> bigquery.Client:
     conn = BaseHook.get_connection(conn_id)
     extras = conn.extra_dejson or {}
 
-    project = extras.get("extra_google_cloud_platform_project") or conn.schema
+    # CHANGED: support Airflow GCP extras keys with double-underscore naming
+    #          and provide robust fallbacks to schema and generic keys.
+    project = (
+        extras.get("extra__google_cloud_platform__project")
+        or extras.get("extra_google_cloud_platform_project")
+        or extras.get("project")
+        or conn.schema
+    )
     if not project:
         raise ValueError(
-            f"Connection '{conn_id}' must define "
-            f"extra_google_cloud_platform_project in extras"
+            f"Connection '{conn_id}' must define project (expected one of: "
+            f"extra__google_cloud_platform__project / extra_google_cloud_platform_project / schema)"
         )
 
-    key_path = extras.get("extra_google_cloud_platform_key_path")
+    # CHANGED: read credential source from either key_path or keyfile_dict
+    key_path = (
+        extras.get("extra__google_cloud_platform__key_path")
+        or extras.get("extra_google_cloud_platform_key_path")
+        or extras.get("key_path")
+    )
+    keyfile_dict = (
+        extras.get("extra__google_cloud_platform__keyfile_dict")
+        or extras.get("keyfile_dict")
+    )
+
+    if keyfile_dict:
+        # CHANGED: allow inline service account JSON via keyfile_dict
+        from google.oauth2 import service_account
+        if isinstance(keyfile_dict, str):
+            keyfile_dict = json.loads(keyfile_dict)
+        credentials = service_account.Credentials.from_service_account_info(
+            keyfile_dict,
+            scopes=["https://www.googleapis.com/auth/bigquery"],
+        )
+        return bigquery.Client(credentials=credentials, project=project)
+
     if key_path:
         from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(
@@ -124,6 +152,7 @@ def get_bigquery_client_from_connection(conn_id: str) -> bigquery.Client:
         )
         return bigquery.Client(credentials=credentials, project=project)
 
+    # CHANGED: fallback to environment default credentials
     return bigquery.Client(project=project)
 
 
