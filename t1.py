@@ -47,7 +47,6 @@ ENV_CONFIG = {
 }
 
 config = ENV_CONFIG.get(ENV)
-
 PROJECT_NAME = config["project_name_t"]
 BUCKET_NAME = config["bucket_name_t"]
 
@@ -62,7 +61,7 @@ default_args = {
 }
 
 # ============================================================
-# 🔐 LOAD SECRET CONFIG FROM AIRFLOW VARIABLE
+# 🔐 ADDED: LOAD SECRET CONFIG FROM AIRFLOW VARIABLE
 # ============================================================
 plss_cfg = Variable.get("PLSS_PROJECT_CONFIG", deserialize_json=True)
 
@@ -75,7 +74,7 @@ if not all([SECRET_PROJECT, BQ_SECRET_ID, GCS_SECRET_ID, PLSS_PROJECT]):
     raise ValueError("Missing required secret configuration in PLSS_PROJECT_CONFIG")
 
 # ============================================================
-# 🔐 SECRET MANAGER HELPERS
+# 🔐 ADDED: SECRET MANAGER HELPERS
 # ============================================================
 def get_secret(secret_id: str, project_id: str, version: str = "latest") -> str:
     try:
@@ -98,7 +97,7 @@ def get_secret(secret_id: str, project_id: str, version: str = "latest") -> str:
 
 
 def create_bigquery_client() -> bigquery.Client:
-    """Create BigQuery client using Secret Manager"""
+    """🔐 ADDED: BigQuery client using Secret Manager"""
     secret_json = get_secret(BQ_SECRET_ID, SECRET_PROJECT)
     sa_info = json.loads(secret_json)
 
@@ -115,7 +114,7 @@ def create_bigquery_client() -> bigquery.Client:
 
 
 def create_gcs_client() -> gcs_storage.Client:
-    """Create GCS client using Secret Manager"""
+    """🔐 ADDED: GCS client using Secret Manager"""
     secret_json = get_secret(GCS_SECRET_ID, SECRET_PROJECT)
     sa_info = json.loads(secret_json)
 
@@ -133,7 +132,6 @@ def create_gcs_client() -> gcs_storage.Client:
 # CATEGORY-BASED FIELD MAPPING (UNCHANGED)
 # ==================================================
 def category_based_expr(col: str, col_type: str) -> str | None:
-
     category_case = "JSON_VALUE(Payload, '$.Client_Category__c')"
     client_level_case = "JSON_VALUE(Payload, '$.ClientLevel__c')"
     line_of_business_case = "JSON_VALUE(Payload, '$.Business_Segment_LOB_Text__c')"
@@ -154,16 +152,18 @@ def category_based_expr(col: str, col_type: str) -> str | None:
     return None
 
 # ==================================================
-# MAIN TASK
+# MAIN FUNCTION
 # ==================================================
-def generate_merge_sql(**_):
+def generate_merge_sql(**kwargs):
 
-    # 🔐 SECRET-BASED CLIENTS (REPLACED HOOKS)
-    bq_client = create_bigquery_client()
+    # 🔐 CHANGED: replaced BigQueryHook with secret-based client
+    client = create_bigquery_client()
+
+    # 🔐 CHANGED: replaced GCSHook with secret-based client
     gcs_client = create_gcs_client()
 
-    # Load mapping config from GCS
     bucket = gcs_client.bucket(BUCKET_NAME)
+
     config_blob = bucket.blob(CONFIG_FILE)
     config_data = json.loads(config_blob.download_as_text())
 
@@ -172,7 +172,6 @@ def generate_merge_sql(**_):
         for m in config_data.get("field_mappings", [])
     }
 
-    # Fetch target schema
     schema_query = f"""
         SELECT column_name, data_type
         FROM `{PROJECT_ID}.edp_ent_cma_plss_onboarding_src.INFORMATION_SCHEMA.COLUMNS`
@@ -180,17 +179,20 @@ def generate_merge_sql(**_):
         ORDER BY ordinal_position
     """
 
-    schema_result = list(bq_client.query(schema_query).result())
-    schema_dict = {
-        r["column_name"].lower(): r["data_type"].upper().split("(")[0]
-        for r in schema_result
-    }
+    schema_result = list(client.query(schema_query).result())
+    schema_dict = {row["column_name"]: row["data_type"].upper() for row in schema_result}
 
     source_cols = list(schema_dict.keys())
+    source_cols = [c.lower() for c in source_cols]
+
     select_exprs: List[str] = []
 
     for col in source_cols:
-        col_type = schema_dict[col]
+
+        if col in ("orig_src_pst_dts", "source_last_process_dts"):
+            continue
+
+        col_type = schema_dict[col.upper()]
         target_field = mapping.get(col, "").strip()
 
         category_expr = category_based_expr(col, col_type)
@@ -202,38 +204,53 @@ def generate_merge_sql(**_):
             select_exprs.append(f"CAST(NULL AS {col_type}) AS {col}")
         else:
             base_expr = f"JSON_VALUE(Payload, '$.{target_field}')"
-            select_exprs.append(
-                f"SAFE_CAST({base_expr} AS {col_type}) AS {col}"
-            )
+            if col_type == "DATE" and col in (
+                "business_effective_dt",
+                "business_expiration_dt",
+            ):
+                expr = f"DATE(SAFE_CAST({base_expr} AS TIMESTAMP)) AS {col}"
+            else:
+                expr = f"SAFE_CAST({base_expr} AS {col_type}) AS {col}"
+            select_exprs.append(expr)
 
-    select_columns = ",\n    ".join(select_exprs)
+    select_exprs.append(
+        "SAFE_CAST(JSON_VALUE(Payload, '$.CreatedDate') AS TIMESTAMP) AS orig_src_pst_dts"
+    )
+    select_exprs.append(
+        "SAFE_CAST(JSON_VALUE(Payload, '$.LastModifiedDate') AS TIMESTAMP) AS source_last_process_dts"
+    )
 
-    # Render SQL template
+    select_columns = ",\n".join(select_exprs)
+
+    # 🔐 CHANGED: read SQL template using secret-based GCS client
     sql_template = bucket.blob(SQL_TEMPLATE_PATH).download_as_text()
-    rendered_sql = Template(sql_template).render(
+    template = Template(sql_template)
+
+    rendered_sql = template.render(
         PROJECT_ID=PROJECT_ID,
-        RAW_TABLE=RAW_TABLE,
-        TARGET_TABLE=TARGET_TABLE,
         select_columns=select_columns,
         source_columns=source_cols,
+        RAW_TABLE=RAW_TABLE,
+        TARGET_TABLE=TARGET_TABLE,
     )
 
     logger.info("Executing MERGE SQL")
-    bq_client.query(rendered_sql).result()
-    logger.info("MERGE completed successfully")
+    client.query(rendered_sql).result()
+    logger.info("MERGE completed successfully.")
 
-# --------------------------------------------------
-# DAG Definition
-# --------------------------------------------------
-with DAG(
-    dag_id="PCT_WRITE_TO_PLSS_READ_CUSTOMER_ACCOUNT_STRUCTURE",
+# ==================================================
+# DAG DEFINITION
+# ==================================================
+dag = DAG(
+    "PCT_WRITE_TO_PLSS_READ_CUSTOMER_ACCOUNT_STRUCTURE",
     default_args=default_args,
     schedule_interval=None,
-    catchup=False,
-    tags=["cvs_app_id:APM0017121", f"project_id:{PROJECT_NAME}"],
-) as dag:
+    description="Dynamic JSON → BigQuery mapping + SCD1 merge using sf_account_id",
+    tags=["cvs_app_id:APM0017121", f"project_id:edp-{ENV}-carema"],
+)
 
-    move_data = PythonOperator(
-        task_id="move_data_from_PCT_to_PLSS",
-        python_callable=generate_merge_sql,
-    )
+build_insert_task = PythonOperator(
+    task_id="build_and_execute_mapping_query",
+    python_callable=generate_merge_sql,
+    dag=dag,
+)
